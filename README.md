@@ -10,24 +10,28 @@ A minimal macOS menubar app that displays ping times as a compact visualization.
 ```
 PING_HOST = "1.1.1.1"
 PING_INTERVAL = 2.0  # seconds
-PING_SAMPLES = 16    # number of readings to show
-PING_WAIT = 1000     # ping -W value in ms
+PING_SAMPLES = 16  # number of readings to show
+PING_WAIT = 1000  # ping -W value in ms
 
 # Ping time ranges and colors (RGB)
 TIERS = [
     {"limit": 0, "color": NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 1.0)},
-    {"limit": 70, "color": NSColor.colorWithRed_green_blue_alpha_(13/255, 215/255, 33/255, 1.0)},
-    {"limit": 150, "color": NSColor.colorWithRed_green_blue_alpha_(209/255, 214/255, 39/255, 1.0)},
-    {"limit": 300, "color": NSColor.colorWithRed_green_blue_alpha_(209/255, 15/255, 29/255, 1.0)},
+    {"limit": 70, "color": NSColor.colorWithRed_green_blue_alpha_(0.051, 0.843, 0.129, 1.0)},
+    {"limit": 150, "color": NSColor.colorWithRed_green_blue_alpha_(0.820, 0.839, 0.153, 1.0)},
+    {"limit": 300, "color": NSColor.colorWithRed_green_blue_alpha_(0.820, 0.059, 0.114, 1.0)},
 ]
 
 BAR_WIDTH = 3
 BAR_HEIGHT = 18
 ```
 
-## Installation Options
+## Quick Installation
 
-### Quick Start (Run from Python)
+Download the [latest release](https://github.com/simpleapps-public/ping-menubar/releases).
+
+## Development Setup
+
+### Run directly
 ```bash
 # Optional: Set up virtual environment
 python3 -m venv venv
@@ -40,7 +44,9 @@ pip install -r requirements.txt
 python ping-menubar.py
 ```
 
-### Install as App (required to launch at login)
+### Build as an application
+Required for launch-at-login functionality
+
 ```bash
 # Install build dependencies
 pip install -r requirements.txt
