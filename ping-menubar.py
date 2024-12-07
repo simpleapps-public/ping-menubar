@@ -15,7 +15,6 @@ from AppKit import (
     NSMenuItem,
     NSPoint,
     NSStatusBar,
-    NSVariableStatusItemLength,
 )
 from Foundation import (
     NSObject,
@@ -53,9 +52,17 @@ class PingMonitor(NSObject):
         
         # Add menu items
         self.menu = NSMenu.new()
+        self.statusitem.setMenu_(self.menu)
+
+        self.last_ping_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Last ping: --", None, ""
+        )
+        self.menu.addItem_(self.last_ping_item)
+
         self.startup_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
             "Launch at Login", "toggleStartup:", ""
         )
+        self.menu.addItem_(NSMenuItem.separatorItem())
         self.startup_item.setTarget_(self)
         self.menu.addItem_(self.startup_item)
 
@@ -63,8 +70,7 @@ class PingMonitor(NSObject):
             "Quit", "terminate:", "q"
         )
         self.menu.addItem_(NSMenuItem.separatorItem())
-        self.menu.addItem_(self.quit_item)  
-        self.statusitem.setMenu_(self.menu)
+        self.menu.addItem_(self.quit_item)
         
         # Add image
         self.image = NSImage.alloc().initWithSize_((self.width, BAR_HEIGHT))
@@ -91,12 +97,12 @@ class PingMonitor(NSObject):
     def update_(self, timer):
         """Called every update cycle"""
         start = time()
-        ping_time = self.get_ping_time()
-        self.times.append(-1 if ping_time is None else ping_time)
+        self.times.append(self.run_ping())
+        self.update_last_ping_texts()
         self.update_graph()
         self.schedule_next_update(time() - start)
 
-    def get_ping_time(self) -> Optional[float]:
+    def run_ping(self) -> Optional[float]:
         """Subprocess call to ping"""
         try:
             result = subprocess.run(
@@ -111,6 +117,15 @@ class PingMonitor(NSObject):
         except:
             pass    
         return None
+
+    def update_last_ping_texts(self):
+        if self.times[-1] is not None:
+            status_text = f"Last ping: {self.times[-1]:.3f} ms"
+        else:
+            status_text = "Last ping: Failed"
+
+        self.last_ping_item.setTitle_(status_text)
+        self.statusitem.button().setToolTip_(status_text)
 
     def update_graph(self):
         self.image.lockFocus()
@@ -132,7 +147,7 @@ class PingMonitor(NSObject):
         self.statusitem.button().setNeedsDisplay_(True)
 
     def draw_bar(self, value: float, x: int):
-        if value != -1:
+        if value is not None:
             self.draw_time_bar(value, x)
         else:
             self.draw_error_bar(x)
@@ -189,7 +204,7 @@ class PingMonitor(NSObject):
 
 def main():
     app = NSApplication.sharedApplication()
-    monitor = PingMonitor.alloc().init()
+    PingMonitor.alloc().init()
     app.run()
 
 if __name__ == "__main__":
