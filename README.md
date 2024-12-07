@@ -6,6 +6,25 @@ A minimal macOS menubar app that displays real-time ping times as a compact visu
   <img src="sc.png" />
 </div>
 
+### Configuration options
+```
+PING_HOST = "1.1.1.1"
+PING_INTERVAL = 2.0  # seconds
+PING_SAMPLES = 16    # number of readings to show
+PING_WAIT = 1000     # ping -W value in ms
+
+# Ping time ranges and colors (RGB)
+TIERS = [
+    {"limit": 0, "color": NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 1.0)},
+    {"limit": 70, "color": NSColor.colorWithRed_green_blue_alpha_(13/255, 215/255, 33/255, 1.0)},
+    {"limit": 150, "color": NSColor.colorWithRed_green_blue_alpha_(209/255, 214/255, 39/255, 1.0)},
+    {"limit": 300, "color": NSColor.colorWithRed_green_blue_alpha_(209/255, 15/255, 29/255, 1.0)},
+]
+
+BAR_WIDTH = 3
+BAR_HEIGHT = 18
+```
+
 ## Installation Options
 
 ### Quick Start (Run from Python)
