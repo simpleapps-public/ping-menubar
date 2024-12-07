@@ -1,6 +1,6 @@
 # ping-menubar
 
-A minimal macOS menubar app that displays real-time ping times as a compact visualization.
+A minimal macOS menubar app that displays ping times as a compact visualization.
 
 <div style="display: flex; gap: 10px;">
   <img src="sc.png" />
