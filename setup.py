@@ -7,8 +7,8 @@ OPTIONS = {
         'LSUIElement': True,
         'LSBackgroundOnly': True,  
         'CFBundleIdentifier': 'com.example.ping-menubar',
-        'CFBundleShortVersionString': '1.0.0',
-        'CFBundleVersion': '1.0.0', 
+        'CFBundleShortVersionString': '1.1.0',
+        'CFBundleVersion': '1.1.0', 
     },
     'packages': ['Foundation', 'AppKit'],
 }
