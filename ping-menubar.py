@@ -1,6 +1,7 @@
 from collections import deque
 from time import time
 from typing import Optional
+from concurrent.futures import ThreadPoolExecutor
 import re
 import subprocess
 
@@ -15,6 +16,8 @@ from AppKit import (
     NSMenuItem,
     NSPoint,
     NSStatusBar,
+    NSThread,
+    NSBundle,
 )
 from Foundation import (
     NSObject,
@@ -28,16 +31,17 @@ from ServiceManagement import (
 
 # Configuration
 PING_HOST = "1.1.1.1"
-PING_INTERVAL = 2.0  # seconds
-PING_SAMPLES = 16  # number of readings to show
-PING_WAIT = 1000  # ping -W value in ms
+PING_INTERVAL = 1  # seconds
+PING_SAMPLES = 16  # number of results to show
+MAX_WORKERS = 2
+PING_TIMEOUT = PING_INTERVAL * MAX_WORKERS
 
 # Ping time ranges and colors (RGB)
 TIERS = [
     {"limit": 0, "color": NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 1.0)},
     {"limit": 70, "color": NSColor.colorWithRed_green_blue_alpha_(0.051, 0.843, 0.129, 1.0)},
     {"limit": 150, "color": NSColor.colorWithRed_green_blue_alpha_(0.820, 0.839, 0.153, 1.0)},
-    {"limit": 300, "color": NSColor.colorWithRed_green_blue_alpha_(0.820, 0.059, 0.114, 1.0)},
+    {"limit": 800, "color": NSColor.colorWithRed_green_blue_alpha_(0.820, 0.059, 0.114, 1.0)},
 ]
 
 BAR_WIDTH = 3
@@ -50,6 +54,7 @@ class PingMonitor(NSObject):
         self.width = PING_SAMPLES * BAR_WIDTH
         self.statusbar = NSStatusBar.systemStatusBar()
         self.statusitem = self.statusbar.statusItemWithLength_(self.width)
+        self.thread_pool = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
         # Add menu items
         self.menu = NSMenu.new()
@@ -63,9 +68,10 @@ class PingMonitor(NSObject):
         self.startup_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
             "Launch at Login", "toggleStartup:", ""
         )
-        self.menu.addItem_(NSMenuItem.separatorItem())
-        self.startup_item.setTarget_(self)
-        self.menu.addItem_(self.startup_item)
+        if NSBundle.mainBundle().bundleIdentifier() != "org.python.python":
+            self.menu.addItem_(NSMenuItem.separatorItem())
+            self.startup_item.setTarget_(self)
+            self.menu.addItem_(self.startup_item)
 
         self.quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
             "Quit", "terminate:", "q"
@@ -81,43 +87,53 @@ class PingMonitor(NSObject):
         self.service = SMAppService.mainAppService()
         self.updateStartupItemState()
 
-        # Schedule update to run immediately.
-        self.schedule_next_update(PING_INTERVAL)
+        # Register timer
+        self.init_timer()
+
+        # Request initial ping (instead of waiting for timer)
+        self.requestPing()
         return self
 
-    def schedule_next_update(self, processing_time):
-        """Schedule next update cycle"""
-        interval = max(0.1, PING_INTERVAL - processing_time)
+    def init_timer(self):
+        """Add a repeating timer to necessary event loops"""
         self.timer = NSTimer.timerWithTimeInterval_target_selector_userInfo_repeats_(
-            interval, self, "update:", None, False
+            PING_INTERVAL, self, "requestPing", None, True
         )
         runLoop = NSRunLoop.currentRunLoop()
-        runLoop.addTimer_forMode_(self.timer, "NSEventTrackingRunLoopMode")
         runLoop.addTimer_forMode_(self.timer, "NSDefaultRunLoopMode")
+        runLoop.addTimer_forMode_(self.timer, "NSEventTrackingRunLoopMode")
 
-    def update_(self, timer):
-        """Called every update cycle"""
-        start = time()
-        self.times.append(self.run_ping())
-        self.update_last_ping_texts()
-        self.update_graph()
-        self.schedule_next_update(time() - start)
+    def requestPing(self):
+        """Initiate background ping request"""
+        # Ignore requests if the are backing up.
+        if self.thread_pool._work_queue.qsize() < 3:
+            self.thread_pool.submit(self.run_ping_background)
 
-    def run_ping(self) -> Optional[float]:
+    def run_ping_background(self):
         """Subprocess call to ping"""
+        ping_ms: Optional[float] = None
         try:
             result = subprocess.run(
-                ["ping", "-W", str(PING_WAIT), "-c", "1", PING_HOST],
+                ["ping", "-W", str(PING_TIMEOUT * 1000), "-c", "1", PING_HOST],
                 capture_output=True,
                 text=True,
-                timeout=PING_INTERVAL,
+                timeout=PING_TIMEOUT,
             )
             if result.returncode == 0:
                 if match := re.search(r"time=(\d+\.?\d*)\s*ms", result.stdout):
-                    return float(match.group(1))
+                    ping_ms = float(match.group(1))
         except:
             pass
-        return None
+
+        self.performSelectorOnMainThread_withObject_waitUntilDone_(
+            "handlePingResultOnMainThread:", ping_ms, False
+        )
+
+    def handlePingResultOnMainThread_(self, ping_ms: Optional[float]):
+        assert NSThread.isMainThread()
+        self.times.append(ping_ms)
+        self.update_last_ping_texts()
+        self.update_graph()
 
     def update_last_ping_texts(self):
         if self.times[-1] is not None:
